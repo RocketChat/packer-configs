@@ -1,2 +1,2 @@
-# rc-server-deployment-methods
-Automation for our RocketChat server deployment methods
+# RC packer files for DO, AWS and Oracle markeplace images
+
