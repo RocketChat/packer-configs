@@ -1,0 +1,24 @@
+# action.yml
+name: 'Packer Deployment'
+description: 'Runs a packer deployment using the docker image'
+inputs:
+  rocketchat_version:  # id of input
+    description: 'The version of rocketchat to install'
+    default: 'latest'
+    required: false
+  do_token:  # id of input
+    description: 'Token for DigitalOcean API'
+    required: true
+  aws_key_id:  # id of input
+    description: 'Key ID for AWS'
+    required: true
+  aws_secret_key:  # id of input
+    description: 'Secret Key for AWS'
+    required: true
+outputs:
+  do_image_id: # id of output
+    description: 'Image ID generated from DigitalOcean'
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  #image: r0zbot/packer-doctl-awscli:latest
