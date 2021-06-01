@@ -41,4 +41,4 @@ sudo truncate -s 0 /var/log/kern.log
 sudo truncate -s 0 /var/log/ufw.log
 sudo truncate -s 0 /var/log/auth.log
 sudo truncate -s 0 /var/log/apport.log
-sudo rm -f /root/.ssh/authorized_keys /etc/ssh/*key*
+sudo rm -f /root/.ssh/authorized_keys /etc/ssh/*key* /home/ubuntu/.ssh/authorized_keys
