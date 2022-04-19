@@ -1,33 +1,36 @@
-locals { 
+locals {
   timestamp = regex_replace(timestamp(), "[- TZ:]", "")
 }
 
 variable "rocketchat_version" {
-    type    = string
-    default = "latest"
+  type    = string
+  default = "latest"
 }
 
 variable "aws_key_id" {
-    type    = string
+  type = string
+  default = ""
 }
 variable "aws_secret_key" {
-    type    = string
+  type = string
+  default = ""
 }
 
 variable "do_token" {
-    type    = string
+  type = string
+  default = ""
 }
 variable "do_size" {
-    type    = string
-    default = "s-1vcpu-1gb"
+  type    = string
+  default = "s-1vcpu-1gb"
 }
 variable "do_region" {
-    type    = string
-    default = "nyc3"
+  type    = string
+  default = "nyc3"
 }
 
 locals {
-    image_name = "rocket-chat-${var.rocketchat_version}-${local.timestamp}"
+  image_name = "rocket-chat-${var.rocketchat_version}-${local.timestamp}"
 }
 
 source "amazon-ebs" "aws-ami" {
@@ -36,32 +39,24 @@ source "amazon-ebs" "aws-ami" {
   instance_type = "t2.micro"
   region        = "us-east-1"
   secret_key    = "${var.aws_secret_key}"
-  source_ami_filter {
-    filters = {
-      name                = "ubuntu/images/*ubuntu-focal-20.04-amd64-server-*"
-      root-device-type    = "ebs"
-      virtualization-type = "hvm"
-    }
-    most_recent = true
-    owners      = ["099720109477"]
-  }
-  ssh_username = "ubuntu"
+  source_ami    = "ami-04505e74c0741db8d"
+  ssh_username  = "ubuntu"
 }
 
 source "digitalocean" "do-marketplace" {
   api_token     = "${var.do_token}"
   snapshot_name = "${local.image_name}"
   size          = "s-1vcpu-1gb-amd"
-  region        = "nyc3"
+  region        = "blr1"
   image         = "ubuntu-20-04-x64"
   ssh_username  = "root"
 }
 
 source "vagrant" "rocket-chat" {
-  source_path = "bento/ubuntu-20.04"
-  provider = "virtualbox"
+  source_path  = "bento/ubuntu-20.04"
+  provider     = "virtualbox"
   communicator = "ssh"
-  add_force = true
+  add_force    = true
 }
 
 build {
@@ -78,70 +73,91 @@ build {
   }
 
   provisioner "shell" {
-    # Allow time for the instance to properly initialize after SSH is ready
-    pause_before = "30s" 
+    pause_before      = "30s"
     expect_disconnect = true
     inline = [
-      "sudo apt-get -y update",
-      "sudo DEBIAN_FRONTEND=noninteractive apt-get -o Dpkg::Options::='--force-confold' -y -q upgrade",
+      "sudo apt update -qqq",
+      "DEBIAN_FRONTEND=noninteractive sudo apt -y -qqq upgrade",
       "sudo reboot",
     ]
   }
 
-  provisioner "file"{
+  provisioner "shell" {
+    script = "./scripts/swap.sh"
+  }
+
+  provisioner "file" {
     pause_before = "30s"
-    source = "image_creation/motd.sh"
+    source       = "./scripts/01-set-root-url.sh"
+    destination  = "/tmp/01-set-root-url.sh"
+  }
+
+
+  provisioner "shell" {
+    inline = [
+      "sudo mv -v /tmp/01-set-root-url.sh /var/lib/cloud/scripts/per-instance/01-set-root-url.sh"
+    ]
+  }
+
+
+
+  provisioner "file" {
+    source      = "./scripts/motd.sh"
     destination = "/tmp/motd.sh"
   }
 
   provisioner "shell" {
-    script = "image_creation/provision.sh"
+    inline = [
+      "sudo mv -v /tmp/motd.sh /etc/update-motd.d/99-image-readme",
+      "sudo chmod 755 /etc/update-motd.d/99-image-readme",
+      "sudo sed -i 's/^PrintMotd no/PrintMotd yes/' /etc/ssh/sshd_config",
+      "sudo touch /etc/motd.tail",
+    ]
+  }
+
+  provisioner "shell" {
+    script = "./scripts/provision.sh"
     environment_vars = [
       "SOURCE_NAME=${source.name}",
-      "BUILD_HOST=${build.Host}",
       "ROCKETCHAT_VERSION=${var.rocketchat_version}",
     ]
   }
 
   provisioner "shell" {
-    only = ["amazon-ebs.aws-ami"]
-    # Allow it to run on the 8GB free-tier instance
-    inline = [
-      "sudo sed -i '/^ExecStart/ s/$/ --smallfiles/' /lib/systemd/system/mongod.service", 
-    ]
+    script = "./scripts/firewall.sh"
   }
 
   provisioner "shell" {
-    only = ["digitalocean.do-marketplace"]
-    inline = [
-      "git clone https://github.com/digitalocean/marketplace-partners.git",
-      "./marketplace-partners/scripts/90-cleanup.sh ",
-      "./marketplace-partners/scripts/99-img-check.sh ",
-      "rm -rf marketplace-partners",
-    ]
+    //   pause_before = "10s"
+    script = "./scripts/remove_machine_id.sh"
   }
 
-  post-processor "manifest" {
-    output = "manifest.json"
-    strip_path = true
-    custom_data = {
-      do_size    = "${var.do_size}"
-      do_region  = "${var.do_region}"
-      image_name = "${local.image_name}"
-    }
+  provisioner "shell" {
+    script = "./scripts/extra.sh"
   }
 
-  post-processor "shell-local" {
-    only = ["amazon-ebs.aws-ami"]
-    inline = [
-      "packer build -var 'image_name=${local.image_name}' -var 'aws_secret_key=${var.aws_secret_key}' -var 'aws_key_id=${var.aws_key_id}' -only amazon-ebs.aws-ami image_test/image_test.pkr.hcl",
-    ]
-  }
+  // post-processor "manifest" {
+  //   only       = ["digitalocean.do-marketplace"]
+  //   output     = "manifest.json"
+  //   strip_path = true
+  //   custom_data = {
+  //     do_size    = "${var.do_size}"
+  //     do_region  = "${var.do_region}"
+  //     image_name = "${local.image_name}"
+  //   }
+  // }
 
-  post-processor "shell-local" {
-    only = ["digitalocean.do-marketplace"]
-    inline = [
-      "packer build -var 'image_name=${local.image_name}' -var \"do_image_id=$(jq -r '.builds[] | select(.builder_type== \"digitalocean\")' manifest.json | jq -r '.artifact_id' | cut -d':' -f 2 )\" -var 'do_token=${var.do_token}' -only digitalocean.do-marketplace image_test/image_test.pkr.hcl",
-    ]
-  }
+  // post-processor "shell-local" {
+  //   only = ["amazon-ebs.aws-ami"]
+  //   inline = [
+  //     "packer build -var 'image_name=${local.image_name}' -var 'aws_secret_key=${var.aws_secret_key}' -var 'aws_key_id=${var.aws_key_id}' -only amazon-ebs.aws-ami image_test/image_test.pkr.hcl",
+  //   ]
+  // }
+
+  // post-processor "shell-local" {
+  //   only = ["digitalocean.do-marketplace"]
+  //   inline = [
+  //     "packer build -var 'image_name=${local.image_name}' -var \"do_image_id=$(jq -r '.builds[] | select(.builder_type== \"digitalocean\")' manifest.json | jq -r '.artifact_id' | cut -d':' -f 2 )\" -var 'do_token=${var.do_token}' -only digitalocean.do-marketplace image_test/image_test.pkr.hcl",
+  //   ]
+  // }
 }
