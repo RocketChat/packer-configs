@@ -21,4 +21,3 @@ outputs:
 runs:
   using: 'docker'
   image: 'Dockerfile'
-  #image: r0zbot/packer-doctl-awscli:latest

@@ -1,6 +1,6 @@
 FROM hashicorp/packer:1.7.2
 
-RUN apk add sudo curl wget openssh jq
+RUN apk add --no-cache sudo curl wget openssh jq
 
 COPY . /deploy
 
