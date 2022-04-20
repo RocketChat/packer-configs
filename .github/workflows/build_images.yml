@@ -1,0 +1,43 @@
+name: Build DigitalOcean and AWS images
+
+on:
+  release: { types: [published] }
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Fix template
+        uses: hashicorp/packer-github-actions@master
+        with:
+          command: fix
+          target: rocketchat.pkr.hcl
+
+      - name: Validate template
+        uses: hashicorp/packer-github-actions@master
+        with:
+          command: validate
+          arguments: -syntax-only
+          target: rocketchat.pkr.hcl
+
+      - name: Initialize plugins
+        uses: hashicorp/packer-github-actions@master
+        with:
+          command: init
+          target: rocketchat.pkr.hcl
+
+      - name: Build images
+        uses: hashicorp/packer-github-actions@master
+        with:
+          command: build
+          arguments: "-color=false -on-error=abort"
+          target: rocketchat.pkr.hcl
+        env:
+          PACKER_LOG: 1
+          PKR_VAR_rocketchat_version: ${{ github.event.release.tag_name }}
+          PKR_VAR_do_token: ${{ secrets.DO_TOKEN }}
+          PKR_VAR_aws_key_id: ${{ secrets.AWS_KEY_ID }}
+          PKR_VAR_aws_secret_key: ${{ secrets.AWS_SECRET_KEY }}
