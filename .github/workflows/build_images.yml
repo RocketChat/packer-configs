@@ -14,7 +14,7 @@ jobs:
         uses: hashicorp/packer-github-actions@master
         with:
           command: validate
-          target: rocketchat.pkr.hcl variables.pkr.hcl
+          target: rocketchat.pkr.hcl
 
       - name: Install plugins
         uses: hashicorp/packer-github-actions@master
@@ -32,7 +32,7 @@ jobs:
         uses: hashicorp/packer-github-actions@master
         with:
           command: build
-          arguments: "-color=false -on-error=run-cleanup-provisioner -var-file=variables.pkr.hcl -only=source.amazon-ebs.aws-ami"
+          arguments: "-color=false -on-error=run-cleanup-provisioner -only=source.amazon-ebs.aws-ami"
           target: rocketchat.pkr.hcl
         env:
           PACKER_LOG: 1
@@ -49,7 +49,7 @@ jobs:
         uses: hashicorp/packer-github-actions@master
         with:
           command: build
-          arguments: "-color=false -on-error=run-cleanup-provisioner -var-file=variables.pkr.hcl -only=source.digitalocean.do-marketplace"
+          arguments: "-color=false -on-error=run-cleanup-provisioner -only=source.digitalocean.do-marketplace"
           target: rocketchat.pkr.hcl
         env:
           PACKER_LOG: 1
