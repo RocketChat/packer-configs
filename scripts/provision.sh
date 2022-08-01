@@ -2,6 +2,9 @@
 
 chmod +x /tmp/deploy.sh
 
+echo "Installing jq (deploy.sh depends)"
+sudo apt install -y jq
+
 /tmp/deploy.sh --version ${VERSION?no version specified}
 
 platform="${PLATFORM?no platform specified}"
