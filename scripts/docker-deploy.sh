@@ -51,6 +51,7 @@ command_exists() {
 _substitute_or_inject_variable() {
   local variable=${1?} value=${2?} file=${3?}
   ((DRY_RUN)) && { info "$variable=$value"; return; }
+  [[ -f $file ]] || touch $file
   if grep -Eq "^$variable=.+" $file && ! ((FORCE)); then
     warn "value for \"$variable\" already exists; skipping; use --force to overwrite"
     return
@@ -94,8 +95,8 @@ do_install_compose() {
 }
 
 download_files() {
-  local name location files_to_download=($COMPOSE_TEMPLATE)
-  if ! ((NO_AUTH)); then files_to_download+=($COMPOSE_ROLE_FIX_SCRIPT); fi
+  local name location files_to_download=(COMPOSE_TEMPLATE)
+  if ! ((NO_AUTH)); then files_to_download+=(COMPOSE_ROLE_FIX_SCRIPT); fi
   info "downloading templates and helpers"
   for obj in ${files_to_download[@]}; do 
     name="$(eval printf \${$obj\[name\]})"
@@ -198,8 +199,8 @@ deploy() {
   fi
 
   # check version string
-  curl --silent "https://releases.rocket.chat/$VERSION/info" | jq -e . || error "unknown version provided $VERSION"
-  _substitute_or_inject_variable RELEASE $VERSION
+  curl --silent "https://releases.rocket.chat/$VERSION/info" | &>/dev/null jq -e . || error "unknown version provided $VERSION"
+  _substitute_or_inject_variable RELEASE $VERSION .env
 
   info "pulling docker images"
   run_sudoless docker compose -f ${COMPOSE_TEMPLATE[name]} pull || error "failed to pull some images; see above for more information"
