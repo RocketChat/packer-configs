@@ -24,6 +24,9 @@ jobs:
     needs:
       - setup
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
       - name: Install plugins
         uses: hashicorp/packer-github-actions@master
         with:
@@ -47,6 +50,9 @@ jobs:
     needs:
       - setup
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
       - name: Install plugins
         uses: hashicorp/packer-github-actions@master
         with:
