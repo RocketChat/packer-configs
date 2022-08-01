@@ -203,11 +203,11 @@ deploy() {
   _substitute_or_inject_variable RELEASE $RELEASE .env
 
   info "pulling docker images"
-  run_sudoless docker compose -f ${COMPOSE_TEMPLATE[name]} pull || error "failed to pull some images; see above for more information"
+  run docker compose -f ${COMPOSE_TEMPLATE[name]} pull || error "failed to pull some images; see above for more information"
   ((ENABLE_HTTPS)) && { run_sudoless docker compose -f ${COMPOSE_TRAEFIK_TEMPLATE[name]} pull || error "failed to pull traefik image; see above for more information"; }
 
   info "deploying Rocket.Chat"
-  run_sudoless docker compose -f ${COMPOSE_TEMPLATE[name]} up -d || error "Rocket.Chat deployment failed; see above for more information"
+  run docker compose -f ${COMPOSE_TEMPLATE[name]} up -d || error "Rocket.Chat deployment failed; see above for more information"
   ((ENABLE_HTTPS)) && { run_sudoless docker compose -f ${COMPOSE_TRAEFIK_TEMPLATE[name]} up -d || error "traefik deployment failed; see above for more information"; }
 }
 
