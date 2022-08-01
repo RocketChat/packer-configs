@@ -5,7 +5,7 @@ chmod +x /tmp/deploy.sh
 echo "Installing jq (deploy.sh depends)"
 sudo apt install -y jq
 
-/tmp/deploy.sh --version ${RELEASE?no version specified}
+/tmp/deploy.sh --release ${RELEASE?no version specified} --no-auth
 
 platform="${PLATFORM?no platform specified}"
 search_regex="^(DEPLOY_PLATFORM)=.*"

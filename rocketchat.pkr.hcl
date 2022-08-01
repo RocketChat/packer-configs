@@ -30,7 +30,7 @@ variable "do_region" {
 }
 
 locals {
-  image_name = "rocket-chat-${var.rocketchat_version}-${local.timestamp}"
+  image_name = "rocket-chat-${var.rocketchat_release}-${local.timestamp}"
 }
 
 source "amazon-ebs" "aws-ami" {
