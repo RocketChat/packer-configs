@@ -4,34 +4,61 @@ on:
   release: { types: [published] }
 
 jobs:
-  build:
+  setup:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
 
+      # fix backwards incompatibilities in template
+      - name: Fix Template
+        uses: hashicorp/packer-github-actions@master
+        with:
+          command: fix
+          target: rocketchat.pkr.hcl variables.pkr.hcl
+
       - name: Validate template
         uses: hashicorp/packer-github-actions@master
         with:
           command: validate
-          arguments: -syntax-only
-          target: rocketchat.pkr.hcl
+          target: rocketchat.pkr.hcl variables.pkr.hcl
 
-      - name: Initialize plugins
+      - name: Install plugins
         uses: hashicorp/packer-github-actions@master
         with:
           command: init
           target: rocketchat.pkr.hcl
 
-      - name: Build images
+  # Runs the builds parallely
+  build-aws:
+    runs-on: ubuntu-latest
+    needs:
+      - setup
+    steps:
+      - name: Build AMI
         uses: hashicorp/packer-github-actions@master
         with:
           command: build
-          arguments: "-color=false -on-error=abort"
+          arguments: "-color=false -on-error=run-cleanup-provisioner -var-file=variables.pkr.hcl -only=source.amazon-ebs.aws-ami"
+          target: rocketchat.pkr.hcl
+        env:
+          PACKER_LOG: 1
+          PKR_VAR_rocketchat_version: ${{ github.event.release.tag_name }}
+          PKR_VAR_aws_key_id: ${{ secrets.AWS_KEY_ID }}
+          PKR_VAR_aws_secret_key: ${{ secrets.AWS_SECRET_KEY }}
+
+  build-digitalocean:
+    runs-on: ubuntu-latest
+    needs:
+      - setup
+    steps:
+      - name: Build DigitalOcean image
+        uses: hashicorp/packer-github-actions@master
+        with:
+          command: build
+          arguments: "-color=false -on-error=run-cleanup-provisioner -var-file=variables.pkr.hcl -only=source.digitalocean.do-marketplace"
           target: rocketchat.pkr.hcl
         env:
           PACKER_LOG: 1
           PKR_VAR_rocketchat_version: ${{ github.event.release.tag_name }}
           PKR_VAR_do_token: ${{ secrets.DO_TOKEN }}
-          PKR_VAR_aws_key_id: ${{ secrets.AWS_KEY_ID }}
-          PKR_VAR_aws_secret_key: ${{ secrets.AWS_SECRET_KEY }}
