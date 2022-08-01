@@ -18,18 +18,18 @@ jobs:
         env:
           PKR_VAR_do_token: "placeholder_for_the_plugin_to_shut_up"
 
-      - name: Install plugins
-        uses: hashicorp/packer-github-actions@master
-        with:
-          command: init
-          target: rocketchat.pkr.hcl
-
   # Runs the builds parallely
   build-aws:
     runs-on: ubuntu-latest
     needs:
       - setup
     steps:
+      - name: Install plugins
+        uses: hashicorp/packer-github-actions@master
+        with:
+          command: init
+          target: rocketchat.pkr.hcl
+
       - name: Build AMI
         uses: hashicorp/packer-github-actions@master
         with:
@@ -47,6 +47,12 @@ jobs:
     needs:
       - setup
     steps:
+      - name: Install plugins
+        uses: hashicorp/packer-github-actions@master
+        with:
+          command: init
+          target: rocketchat.pkr.hcl
+
       - name: Build DigitalOcean image
         uses: hashicorp/packer-github-actions@master
         with:
