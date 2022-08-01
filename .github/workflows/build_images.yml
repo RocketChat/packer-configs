@@ -10,13 +10,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      # fix backwards incompatibilities in template
-      - name: Fix Template
-        uses: hashicorp/packer-github-actions@master
-        with:
-          command: fix
-          target: rocketchat.pkr.hcl variables.pkr.hcl
-
       - name: Validate template
         uses: hashicorp/packer-github-actions@master
         with:
