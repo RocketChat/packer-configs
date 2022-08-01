@@ -2,7 +2,7 @@ locals {
   timestamp = regex_replace(timestamp(), "[- TZ:]", "")
 }
 
-variable "rocketchat_version" {
+variable "rocketchat_release" {
   type    = string
   default = "latest"
 }

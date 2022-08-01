@@ -67,7 +67,7 @@ jobs:
           target: rocketchat.pkr.hcl
         env:
           PACKER_LOG: 1
-          PKR_VAR_rocketchat_version: ${{ github.event.release.tag_name }}
+          PKR_VAR_rocketchat_release: ${{ github.event.release.tag_name }}
           PKR_VAR_aws_key_id: ${{ secrets.AWS_KEY_ID }}
           PKR_VAR_aws_secret_key: ${{ secrets.AWS_SECRET_KEY }}
 
@@ -102,5 +102,5 @@ jobs:
           target: rocketchat.pkr.hcl
         env:
           PACKER_LOG: 1
-          PKR_VAR_rocketchat_version: ${{ github.event.release.tag_name }}
+          PKR_VAR_rocketchat_release: ${{ github.event.release.tag_name }}
           PKR_VAR_do_token: ${{ secrets.DO_TOKEN }}

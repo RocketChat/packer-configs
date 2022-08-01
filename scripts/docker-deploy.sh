@@ -199,8 +199,8 @@ deploy() {
   fi
 
   # check version string
-  curl --silent "https://releases.rocket.chat/$VERSION/info" | &>/dev/null jq -e . || error "unknown version provided $VERSION"
-  _substitute_or_inject_variable RELEASE $VERSION .env
+  curl --silent "https://releases.rocket.chat/$RELEASE/info" | &>/dev/null jq -e . || error "unknown version provided $RELEASE"
+  _substitute_or_inject_variable RELEASE $RELEASE .env
 
   info "pulling docker images"
   run_sudoless docker compose -f ${COMPOSE_TEMPLATE[name]} pull || error "failed to pull some images; see above for more information"
@@ -216,14 +216,14 @@ main() {
   DRY_RUN=0
   ENABLE_HTTPS=0
   NO_AUTH=0
-  VERSION="$(curl -s https://releases.rocket.chat/latest/info | jq .tag -r)"
+  RELEASE="$(curl -s https://releases.rocket.chat/latest/info | jq .tag -r)"
   while [[ -n "$1" ]]; do
     case "$1" in
       "--dry-run") DRY_RUN=1; shift ;;
       "--enable-https") ENABLE_HTTPS=1; shift ;;
       "--force") FORCE=1; shift ;;
       "--no-auth") NO_AUTH=1; shift ;;
-      "--version") VERSION=${2?version must be specified if --version is used}; shift; shift ;;
+      "--release") RELEASE=${2?release must be specified if --release is used}; shift; shift ;;
       *) 
         error "unknown option $1"
         return 1

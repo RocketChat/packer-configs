@@ -2,7 +2,7 @@ locals {
   timestamp = regex_replace(timestamp(), "[- TZ:]", "")
 }
 
-variable "rocketchat_version" {
+variable "rocketchat_release" {
   type    = string
   default = "latest"
 }
@@ -116,7 +116,7 @@ build {
     script = "./scripts/provision.sh"
     environment_vars = [
       "PLATFORM=${source.name}",
-      "VERSION=${var.rocketchat_version}",
+      "RELEASE=${var.rocketchat_release}",
     ]
   }
 
