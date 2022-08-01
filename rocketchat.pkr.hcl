@@ -1,44 +1,10 @@
-locals {
-  timestamp = regex_replace(timestamp(), "[- TZ:]", "")
-}
-
-variable "rocketchat_version" {
-  type    = string
-  default = "latest"
-}
-
-variable "aws_key_id" {
-  type = string
-  default = ""
-}
-variable "aws_secret_key" {
-  type = string
-  default = ""
-}
-
-variable "do_token" {
-  type = string
-  default = ""
-}
-variable "do_size" {
-  type    = string
-  default = "s-1vcpu-1gb"
-}
-variable "do_region" {
-  type    = string
-  default = "nyc3"
-}
-
-locals {
-  image_name = "rocket-chat-${var.rocketchat_version}-${local.timestamp}"
-}
-
 source "amazon-ebs" "aws-ami" {
   access_key    = "${var.aws_key_id}"
   ami_name      = "${local.image_name}"
   instance_type = "t2.micro"
   region        = "us-east-1"
   secret_key    = "${var.aws_secret_key}"
+  /** TODO change this hardcode */
   source_ami    = "ami-04505e74c0741db8d"
   ssh_username  = "ubuntu"
 }
@@ -50,13 +16,6 @@ source "digitalocean" "do-marketplace" {
   region        = "blr1"
   image         = "ubuntu-20-04-x64"
   ssh_username  = "root"
-}
-
-source "vagrant" "rocket-chat" {
-  source_path  = "bento/ubuntu-20.04"
-  provider     = "virtualbox"
-  communicator = "ssh"
-  add_force    = true
 }
 
 build {
@@ -99,8 +58,6 @@ build {
     ]
   }
 
-
-
   provisioner "file" {
     source      = "./scripts/motd.sh"
     destination = "/tmp/motd.sh"
@@ -115,11 +72,16 @@ build {
     ]
   }
 
+  provisioner "file" {
+    source       = "./scripts/docker-deploy.sh"
+    destination  = "/tmp/deploy.sh"
+  }
+
   provisioner "shell" {
     script = "./scripts/provision.sh"
     environment_vars = [
-      "SOURCE_NAME=${source.name}",
-      "ROCKETCHAT_VERSION=${var.rocketchat_version}",
+      "PLATFORM=${source.name}",
+      "VERSION=${var.rocketchat_version}",
     ]
   }
 
@@ -128,7 +90,7 @@ build {
   }
 
   provisioner "shell" {
-    //   pause_before = "10s"
+    pause_before = "10s"
     script = "./scripts/remove_machine_id.sh"
   }
 
@@ -136,16 +98,16 @@ build {
     script = "./scripts/extra.sh"
   }
 
-  // post-processor "manifest" {
-  //   only       = ["digitalocean.do-marketplace"]
-  //   output     = "manifest.json"
-  //   strip_path = true
-  //   custom_data = {
-  //     do_size    = "${var.do_size}"
-  //     do_region  = "${var.do_region}"
-  //     image_name = "${local.image_name}"
-  //   }
-  // }
+  post-processor "manifest" {
+    only       = ["digitalocean.do-marketplace"]
+    output     = "manifest.json"
+    strip_path = true
+    custom_data = {
+      do_size    = "${var.do_size}"
+      do_region  = "${var.do_region}"
+      image_name = "${local.image_name}"
+    }
+  }
 
   // post-processor "shell-local" {
   //   only = ["amazon-ebs.aws-ami"]
