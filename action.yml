@@ -111,14 +111,15 @@ runs:
       run: |
         sudo apt install jq jo -y
         ami_id=$(aws ec2 describe-images --region us-east-1 --filters "Name=creation-date,Values="$(date '+%Y-%m-%d')"*" --filters ${{ format('Name=name,Values=rocket-chat-{0}*', inputs.tag) }} --output text --query 'Images[0].ImageId')
-        aws ec2 create-security-group --group-name bats-${{ inputs.tag }} &&
-          aws ec2 authorize-security-group-ingress --group-id bats-${{ inputs.tag }} --protocol tcp --port 3000 --cidr '0.0.0.0/0'
-        instance_id=$(aws ec2 run-instances --count 1 --image-id $ami_id --instance-type t2.medium --security-group-ids bats-${{ inputs.tag }} --query 'Instances[0].InstanceId' --output text)
+        group_id=$(aws ec2 create-security-group --description "rocket.chat ${{ inputs.tag }}" --group-name bats-${{ inputs.tag }} --query GroupId --output text)
+        aws ec2 authorize-security-group-ingress --group-id $group_id --protocol tcp --port '0-65535' --cidr '0.0.0.0/0'
+        instance_id=$(aws ec2 run-instances --count 1 --image-id $ami_id --instance-type t2.medium --security-group-ids $group_id --query 'Instances[0].InstanceId' --output text)
         aws ec2 wait instance-running --instance-id $instance_id
         rocketchat_host_public_ip=$(aws ec2 describe-instances --instance-id $instance_id --query "Reservations[0].Instances[0].PublicIpAddress" --output text)
         [[ -n "$rocketchat_host_public_ip" ]]
         export ROCKETCHAT_TAG="${{ inputs.tag }}"
         export ROCKETCHAT_HOST="http://${rocketchat_host_public_ip}:3000"
         cd tests && . _.bash && bats api_basic/
-        aws ec2 delete-security-group --group-id bats-${{ inputs.tag }}
         aws ec2 terminate-instances --instance-ids "$instance_id"
+        aws ec2 wait instance-terminated --instance-id $instance_id
+        aws ec2 delete-security-group --group-id $group_id
