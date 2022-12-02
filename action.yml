@@ -11,17 +11,16 @@ inputs:
       Rocket.Chat version tag
     required: true
   digitalocean-token:
-    required: true
+    required: false
     description: DigitalOcean token
   aws-key-id:
-    required: true
+    required: false
     description: AWS key id
   aws-secret-key:
-    required: true
+    required: false
     description: AWS secret key
-  github-token:
-    description: |
-      GitHub Token for creating the release and update repository
+  source:
+    description: Packer source
     required: true
 
 runs:
@@ -49,7 +48,7 @@ runs:
       uses: hashicorp/packer-github-actions@master
       with:
         command: build
-        arguments: "-color=false -on-error=abort"
+        arguments: "-color=false -on-error=abort -only=source.${{ inputs.source }}"
         target: rocketchat.pkr.hcl
       env:
         PACKER_LOG: '1'
@@ -58,12 +57,3 @@ runs:
         PKR_VAR_aws_key_id: ${{ inputs.aws-key-id }}
         PKR_VAR_aws_secret_key: ${{ inputs.aws-secret-key }}
 
-    - name: Create release with artifact
-      uses: softprops/action-gh-release@v1
-      with:
-        repository: RocketChat/rocketchat-packer
-        token: ${{ inputs.github-token }}
-        name: ${{ inputs.tag }}
-        tag_name: ${{ inputs.tag }}
-        body: ${{ format('https://github.com/RocketChat/Rocket.Chat/releases/{0}', inputs.tag) }}
-        draft: false

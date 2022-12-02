@@ -7,6 +7,9 @@ on:
 jobs:
   ManualBuild:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.preflight.outputs.tag }}
+      run: ${{ steps.preflight.outputs.run }}
     steps:
       - name: Check latest
         if: ${{ github.event_name == 'workflow_dispatch' }}
@@ -27,17 +30,52 @@ jobs:
             echo "run=false" >>$GITHUB_OUTPUT
           fi
 
+  ManualAWS:
+    needs:
+      - ManualBuild
+    runs-on: ubuntu-latest
+    steps:
       - name: Build image
-        if: ${{ steps.preflight.outputs.run == 'true' }}
+        if: ${{ needs.ManualBuild.outputs.run == 'true' }}
         uses: RocketChat/rocketchat-packer@main
         with:
-          github-token: ${{ secrets.GH_TOKEN_PERSONAL }}
           aws-key-id: ${{ secrets.AWS_KEY_ID }}
           aws-secret-key: ${{ secrets.AWS_SECRET_KEY }}
-          digitalocean-token: ${{ secrets.DO_TOKEN }}
-          tag: ${{ steps.preflight.outputs.tag }}
+          tag: ${{ needs.ManualBuild.outputs.tag }}
+          source: amazon-ebs.aws-ami
 
-  TriggeredBuild:
+  
+  ManualDigitalOcean:
+    needs:
+      - ManualBuild
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build image
+        if: ${{ needs.ManualBuild.outputs.run == 'true' }}
+        uses: RocketChat/rocketchat-packer@main
+        with:
+          digitalocean-token: ${{ secrets.DO_TOKEN }}
+          tag: ${{ needs.ManualBuild.outputs.tag }}
+          source: digitalocean.do-marketplace 
+
+  CreateReleaseAfterManual:
+    needs:
+      - ManualBuild
+      - ManualAWS
+      - ManualDigitalOcean
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create release with artifact
+        uses: softprops/action-gh-release@v1
+        with:
+          repository: RocketChat/rocketchat-packer
+          token: ${{ secrets.GH_TOKEN_PERSONAL }}
+          name: ${{ needs.ManualBuild.outputs.tag }}
+          tag_name: ${{ needs.ManualBuild.outputs.tag }}
+          body: ${{ format('https://github.com/RocketChat/Rocket.Chat/releases/{0}', needs.ManualBuild.outputs.tag ) }}
+          draft: false
+
+  TriggeredBuildDigitalOcean:
     if: ${{ github.event_name == 'repository_dispatch' }}
     runs-on: ubuntu-latest
     steps:
@@ -45,7 +83,35 @@ jobs:
         uses: RocketChat/rocketchat-packer@main
         with:
           github-token: ${{ secrets.GH_TOKEN_PERSONAL }}
-          aws-key-id: ${{ secrets.AWS_KEY_ID }}
-          aws-secret-key: ${{ secrets.AWS_SECRET_KEY }}
           digitalocean-token: ${{ secrets.DO_TOKEN }}
           tag: ${{ github.event.client_payload.tag }}
+          source: digitalocean.do-marketplace
+
+  TriggeredBuildAWS:
+    if: ${{ github.event_name == 'repository_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build image
+        uses: RocketChat/rocketchat-packer@main
+        with:
+          aws-key-id: ${{ secrets.AWS_KEY_ID }}
+          aws-secret-key: ${{ secrets.AWS_SECRET_KEY }}
+          tag: ${{ github.event.client_payload.tag }}
+          source: amazon-ebs.aws-ami
+
+
+  CreateReleaseAfterEvent:
+    needs:
+      - TriggeredBuildDigitalOcean
+      - TriggeredBuildAWS
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create release with artifact
+        uses: softprops/action-gh-release@v1
+        with:
+          repository: RocketChat/rocketchat-packer
+          token: ${{ secrets.GH_TOKEN_PERSONAL }}
+          name: ${{ github.event.client_payload.tag }}
+          tag_name: ${{ github.event.client_payload.tag }}
+          body: ${{ format('https://github.com/RocketChat/Rocket.Chat/releases/{0}', github.event.client_payload.tag) }}
+          draft: false
