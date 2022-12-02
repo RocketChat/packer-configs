@@ -91,6 +91,7 @@ runs:
         wget https://github.com/digitalocean/doctl/releases/download/v1.84.0/doctl-1.84.0-linux-amd64.tar.gz && 
           tar xf doctl-1.84.0-linux-amd64.tar.gz &&
           sudo mv doctl /usr/local/bin
+        sudo apt install jq jo -y
         doctl auth init --access-token ${{ inputs.digitalocean-token }}
         image_id=$(doctl compute snapshot ls --format ID --no-header "rocket-chat-${{ inputs.tag }}-*")
         rocketchat_host_public_ip=$(doctl compute droplet create --image "$image_id" --size s-2vcpu-4gb --region blr1 --format PublicIPv4 --no-header --wait bats-${{ inputs.tag }})
@@ -108,6 +109,7 @@ runs:
         AWS_SECRET_ACCESS_KEY: ${{ inputs.aws-secret-key }}
         AWS_ACCESS_KEY_ID: ${{ inputs.aws-key-id }}
       run: |
+        sudo apt install jq jo -y
         ami_id=$(aws ec2 describe-images --region us-east-1 --filters "Name=creation-date,Values="$(date '+%Y-%m-%d')"*" --filters ${{ format('Name=name,Values=rocket-chat-{0}*', inputs.tag) }} --output text --query 'Images[0].ImageId')
         aws ec2 create-security-group --group-name bats-${{ inputs.tag }} &&
           aws ec2 authorize-security-group-ingress --group-id bats-${{ inputs.tag }} --protocol tcp --port 3000 --cidr '0.0.0.0/0'
