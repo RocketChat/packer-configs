@@ -31,27 +31,26 @@ runs:
       uses: actions/checkout@v2
       with:
         repository: RocketChat/rocketchat-packer
-        path: marketplace-images
 
     - name: Validate template
       uses: hashicorp/packer-github-actions@master
       with:
         command: validate
         arguments: -syntax-only
-        target: marketplace-images/rocketchat.pkr.hcl
+        target: rocketchat.pkr.hcl
 
     - name: Initialize plugins
       uses: hashicorp/packer-github-actions@master
       with:
         command: init
-        target: marketplace-images/rocketchat.pkr.hcl
+        target: rocketchat.pkr.hcl
 
     - name: Build images
       uses: hashicorp/packer-github-actions@master
       with:
         command: build
         arguments: "-color=false -on-error=abort"
-        target: marketplace-images/rocketchat.pkr.hcl
+        target: rocketchat.pkr.hcl
       env:
         PACKER_LOG: '1'
         PKR_VAR_rocketchat_version: ${{ inputs.tag }}
