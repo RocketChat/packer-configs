@@ -1,37 +1,51 @@
-name: Build DigitalOcean and AWS images
+name: Build Marketplace Images
 
 on:
-  release: { types: [published] }
+  workflow_dispatch:
+  repository_dispatch:
 
 jobs:
-  build:
+  ManualBuild:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
+      - name: Check latest
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        id: preflight
+        run: |
+          command -v jq &>/dev/null || sudo apt install jq -y
+          latest_stable="$(curl -s https://releases.rocket.chat/stable/info | jq -r .tag)"
+          latest_tag_here="$(
+            git -c 'versionsort.suffix=-' ls-remote -t --exit-code --refs --sort=-v:refname "https://github.com/RocketChat/rocketchat-packer" '*' |
+            awk -F/ '$NF !~ /rc|beta/ { print $NF; exit }'
+          )"
+          echo "latest_stable: $latest_stable"
+          echo "latest_tag_here: $latest_tag_here"
+          if [[ "$latest_tag_here" != "$latest_stable" ]]; then
+            echo "run=true" >>$GITHUB_OUTPUT
+            echo "tag=$latest_stable" >>$GITHUB_OUTPUT
+          else
+            echo "run=false" >>$GITHUB_OUTPUT
+          fi
 
-      - name: Validate template
-        uses: hashicorp/packer-github-actions@master
+      - name: Build image
+        if: ${{ steps.preflight.outputs.run == 'true' }}
+        uses: RocketChat/rocketchat-packer@main
         with:
-          command: validate
-          arguments: -syntax-only
-          target: rocketchat.pkr.hcl
+          github-token: ${{ secrets.GH_TOKEN_PERSONAL }}
+          aws-key-id: ${{ secrets.AWS_KEY_ID }}
+          aws-secret-key: ${{ secrets.AWS_SECRET_KEY }}
+          digitalocean-token: ${{ secrets.DO_TOKEN }}
+          tag: ${{ steps.preflight.outputs.tag }}
 
-      - name: Initialize plugins
-        uses: hashicorp/packer-github-actions@master
+  TriggeredBuild:
+    if: ${{ github.event_name == 'repository_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build image
+        uses: RocketChat/rocketchat-packer@main
         with:
-          command: init
-          target: rocketchat.pkr.hcl
-
-      - name: Build images
-        uses: hashicorp/packer-github-actions@master
-        with:
-          command: build
-          arguments: "-color=false -on-error=abort"
-          target: rocketchat.pkr.hcl
-        env:
-          PACKER_LOG: 1
-          PKR_VAR_rocketchat_version: ${{ github.event.release.tag_name }}
-          PKR_VAR_do_token: ${{ secrets.DO_TOKEN }}
-          PKR_VAR_aws_key_id: ${{ secrets.AWS_KEY_ID }}
-          PKR_VAR_aws_secret_key: ${{ secrets.AWS_SECRET_KEY }}
+          github-token: ${{ secrets.GH_TOKEN_PERSONAL }}
+          aws-key-id: ${{ secrets.AWS_KEY_ID }}
+          aws-secret-key: ${{ secrets.AWS_SECRET_KEY }}
+          digitalocean-token: ${{ secrets.DO_TOKEN }}
+          tag: ${{ github.event.client_payload.tag }}
