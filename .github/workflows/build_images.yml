@@ -3,12 +3,8 @@ name: Build DigitalOcean and AWS images
 on:
   release: { types: [published] }
 
-env:
-  PACKER_HOME_DIR: /opt/packer
-  PACKER_PLUGIN_PATH: /opt/packer/plugins
-
 jobs:
-  setup:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -18,89 +14,24 @@ jobs:
         uses: hashicorp/packer-github-actions@master
         with:
           command: validate
+          arguments: -syntax-only
           target: rocketchat.pkr.hcl
-        env:
-          PKR_VAR_do_token: "placeholder_for_the_plugin_to_shut_up"
 
-      - name: Install plugins
+      - name: Initialize plugins
         uses: hashicorp/packer-github-actions@master
         with:
           command: init
           target: rocketchat.pkr.hcl
 
-      - name: Attempt to use or cache packer plugins
-        continue-on-error: true
-        uses: actions/cache@v3
-        with:
-          path: ${{ env.PACKER_PLUGIN_PATH }}
-          key: plugin-cache
-
-  # Runs the builds parallely
-  build-aws:
-    runs-on: ubuntu-latest
-    needs:
-      - setup
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-
-      - name: Attempt to use or cache packer plugins
-        id: plugin-cache-restore
-        continue-on-error: true
-        uses: actions/cache@v3
-        with:
-          path: ${{ env.PACKER_PLUGIN_PATH }}
-          key: plugin-cache
-
-      - name: Install plugins
-        if: ${{ steps.plugin-cache-restore.outputs.cache-hit != 'true' }}
-        uses: hashicorp/packer-github-actions@master
-        with:
-          command: init
-          target: rocketchat.pkr.hcl
-
-      - name: Build AMI
+      - name: Build images
         uses: hashicorp/packer-github-actions@master
         with:
           command: build
-          arguments: "-color=false -on-error=run-cleanup-provisioner -only=amazon-ebs.aws-ami"
+          arguments: "-color=false -on-error=abort"
           target: rocketchat.pkr.hcl
         env:
           PACKER_LOG: 1
-          PKR_VAR_rocketchat_release: ${{ github.event.release.tag_name }}
+          PKR_VAR_rocketchat_version: ${{ github.event.release.tag_name }}
+          PKR_VAR_do_token: ${{ secrets.DO_TOKEN }}
           PKR_VAR_aws_key_id: ${{ secrets.AWS_KEY_ID }}
           PKR_VAR_aws_secret_key: ${{ secrets.AWS_SECRET_KEY }}
-
-  build-digitalocean:
-    runs-on: ubuntu-latest
-    needs:
-      - setup
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-
-      - name: Attempt to use or cache packer plugins
-        id: plugin-cache-restore
-        continue-on-error: true
-        uses: actions/cache@v3
-        with:
-          path: ${{ env.PACKER_PLUGIN_PATH }}
-          key: plugin-cache
-
-      - name: Install plugins
-        if: ${{ steps.plugin-cache-restore.outputs.cache-hit != 'true' }}
-        uses: hashicorp/packer-github-actions@master
-        with:
-          command: init
-          target: rocketchat.pkr.hcl
-
-      - name: Build DigitalOcean image
-        uses: hashicorp/packer-github-actions@master
-        with:
-          command: build
-          arguments: "-color=false -on-error=run-cleanup-provisioner -only=digitalocean.do-marketplace"
-          target: rocketchat.pkr.hcl
-        env:
-          PACKER_LOG: 1
-          PKR_VAR_rocketchat_release: ${{ github.event.release.tag_name }}
-          PKR_VAR_do_token: ${{ secrets.DO_TOKEN }}

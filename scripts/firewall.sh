@@ -1,7 +1,5 @@
 #!/bin/bash
 
-echo "Setting firewall rules"
-
 sudo apt -y install ufw
 sudo ufw allow ssh
 sudo ufw allow 3000/tcp

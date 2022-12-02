@@ -5,8 +5,7 @@ This repo is a Github Action used for building and testing our cloud base images
 ## Development
 
 For development or local build, build and run the docker container, setting as environment variables:
-
-- `INPUT_ROCKETCHAT_RELEASE` - The desired version of Rocket.Chat to build
+- `INPUT_ROCKETCHAT_VERSION` - The desired version of Rocket.Chat to build
 - `INPUT_DO_TOKEN` - Your DigitalOcean token
 - `INPUT_AWS_KEY_ID` - Your AWS key ID
 - `INPUT_AWS_SECRET_KEY` - Your AWS secret

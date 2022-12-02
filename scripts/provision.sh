@@ -1,18 +1,15 @@
 #! /bin/bash
 
-chmod +x /tmp/deploy.sh
+export SOURCE_NAME=${SOURCE_NAME}
+export ROCKETCHAT_VERSION=${ROCKETCHAT_VERSION:-latest}
+export BUILD_HOST="$(curl -s ipinfo.io/ip):3000"
 
-echo "Installing jq (deploy.sh depends)"
-sudo apt install -y jq
+sudo curl -L https://raw.githubusercontent.com/RocketChat/install.sh/master/rocketchatctl -o /usr/local/bin/rocketchatctl
+sudo chmod +x /usr/local/bin/rocketchatctl
+sudo sed -i '/|| print_input_from_pipe_error_and_exit/d' /usr/local/bin/rocketchatctl
+sudo rocketchatctl install --root-url=http://$BUILD_HOST --version=$ROCKETCHAT_VERSION --webserver=traefik --letsencrypt-email=MyRocketChat@DO --bind-loopback=false --use-mongo
+sudo sed -E "s/^(Environment=DEPLOY_PLATFORM)=.+/\1=$SOURCE_NAME/" /lib/systemd/system/rocketchat.service -i
+mongo rocketchat --eval 'db.rocketchat_settings.deleteOne({ _id: "uniqueID" })'
 
-/tmp/deploy.sh --release ${RELEASE?no version specified} --no-auth
-
-platform="${PLATFORM?no platform specified}"
-search_regex="^(DEPLOY_PLATFORM)=.*"
-env_file="$HOME/rocketchat/.env"
-
-grep -qE "$search_regex" "$env_file" && 
-  sed -iE "s/$search_regex/\1=$platform/" $env_file ||
-    echo "DEPLOY_PLATFORM=$platform" >> $env_file
-
-rm -rf /tmp/deploy.sh
+sudo systemctl daemon-reload
+sudo systemctl restart rocketchat
