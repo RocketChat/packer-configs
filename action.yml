@@ -1,23 +1,70 @@
-# action.yml
-name: 'Packer Deployment'
-description: 'Runs a packer deployment using the docker image'
+name: Build marketplace images
+description: |
+  Building disk images for
+    1. DigitalOcean
+    2. AWS (AMI)
+    .. and more
+
 inputs:
-  rocketchat_version:  # id of input
-    description: 'The version of rocketchat to install'
-    default: 'latest'
-    required: false
-  do_token:  # id of input
-    description: 'Token for DigitalOcean API'
+  tag:
+    description: |
+      Rocket.Chat version tag
     required: true
-  aws_key_id:  # id of input
-    description: 'Key ID for AWS'
+  digitalocean-token:
     required: true
-  aws_secret_key:  # id of input
-    description: 'Secret Key for AWS'
+    description: DigitalOcean token
+  aws-key-id:
     required: true
-outputs:
-  do_image_id: # id of output
-    description: 'Image ID generated from DigitalOcean'
+    description: AWS key id
+  aws-secret-key:
+    required: true
+    description: AWS secret key
+  github-token:
+    description: |
+      GitHub Token for creating the release and update repository
+    required: true
+
 runs:
-  using: 'docker'
-  image: 'Dockerfile'
+  using: composite
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+      with:
+        repository: RocketChat/rocketchat-packer
+        path: marketplace-images
+
+    - name: Validate template
+      uses: hashicorp/packer-github-actions@master
+      with:
+        command: validate
+        arguments: -syntax-only
+        target: marketplace-images/rocketchat.pkr.hcl
+
+    - name: Initialize plugins
+      uses: hashicorp/packer-github-actions@master
+      with:
+        command: init
+        target: marketplace-images/rocketchat.pkr.hcl
+
+    - name: Build images
+      uses: hashicorp/packer-github-actions@master
+      with:
+        command: build
+        arguments: "-color=false -on-error=abort"
+        target: marketplace-images/rocketchat.pkr.hcl
+      env:
+        PACKER_LOG: '1'
+        PKR_VAR_rocketchat_version: ${{ inputs.tag }}
+        PKR_VAR_do_token: ${{ inputs.digitalocean-token }}
+        PKR_VAR_aws_key_id: ${{ inputs.aws-key-id }}
+        PKR_VAR_aws_secret_key: ${{ inputs.aws-secret-key }}
+
+    - name: Create release with artifact
+      uses: softprops/action-gh-release@v1
+      with:
+        repository: RocketChat/rocketchat-packer
+        token: ${{ inputs.github-token }}
+        name: ${{ inputs.tag }}
+        tag_name: ${{ inputs.tag }}
+        body: ${{ format('https://github.com/RocketChat/Rocket.Chat/releases/{0}', inputs.tag) }}
+        draft: false
