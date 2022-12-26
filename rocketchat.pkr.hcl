@@ -52,13 +52,6 @@ source "digitalocean" "do-marketplace" {
   ssh_username  = "root"
 }
 
-source "vagrant" "rocket-chat" {
-  source_path  = "bento/ubuntu-20.04"
-  provider     = "virtualbox"
-  communicator = "ssh"
-  add_force    = true
-}
-
 build {
   sources = [
     "source.digitalocean.do-marketplace",
@@ -76,30 +69,21 @@ build {
     pause_before      = "30s"
     expect_disconnect = true
     inline = [
-      "sudo apt update -qqq",
-      "DEBIAN_FRONTEND=noninteractive sudo apt -y -qqq upgrade",
+      "sudo apt-get update -qqq",
+      "DEBIAN_FRONTEND=noninteractive sudo apt-get -y upgrade",
       "sudo reboot",
     ]
   }
 
   provisioner "shell" {
-    script = "./scripts/swap.sh"
-  }
-
-  provisioner "file" {
-    pause_before = "30s"
-    source       = "./scripts/01-set-root-url.sh"
-    destination  = "/tmp/01-set-root-url.sh"
-  }
-
-
-  provisioner "shell" {
     inline = [
-      "sudo mv -v /tmp/01-set-root-url.sh /var/lib/cloud/scripts/per-instance/01-set-root-url.sh"
+      "sudo dd if=/dev/zero of=/swapfile count=512 bs=1M",
+      "sudo chmod 600 /swapfile",
+      "sudo mkswap /swapfile",
+      "sudo swapon /swapfile",
+      "echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab >/dev/null"
     ]
   }
-
-
 
   provisioner "file" {
     source      = "./scripts/motd.sh"
@@ -115,6 +99,19 @@ build {
     ]
   }
 
+  provisioner "file" {
+    source = "./scripts/01-set-root-url.sh"
+    destination  = "/tmp/01-set-root-url.sh"
+  }
+
+  # this should set the currect ROOT_URL on boot
+  provisioner "shell" {
+    inline = [
+      "sudo mv -v /tmp/01-set-root-url.sh /var/lib/cloud/scripts/per-instance/01-set-root-url.sh"
+    ]
+  }
+
+  # TODO change this to something simpler
   provisioner "shell" {
     script = "./scripts/provision.sh"
     environment_vars = [
@@ -124,16 +121,47 @@ build {
   }
 
   provisioner "shell" {
-    script = "./scripts/firewall.sh"
+    inline = [
+      "DEBIAN_FRONTEND=noninteractive sudo apt-get update",
+      "DEBIAN_FRONTEND=noninteractive sudo apt-get install -y ufw",
+      "bash -c 'for allow in ssh 3000/tcp 80/tcp 443/tcp; do sudo ufw allow $allow; done'",
+      "sudo ufw default deny incoming",
+      "sudo ufw default allow outgoing",
+      "bash -c 'yes | sudo ufw enable'"
+    ]
   }
 
   provisioner "shell" {
-    //   pause_before = "10s"
-    script = "./scripts/remove_machine_id.sh"
+    inline = [
+      "bash -c 'if [[ -e /etc/machine-id ]]; then sudo rm -f /etc/machine-id && sudo touch /etc/machine-id; fi'",
+      "bash -c 'if [[ -e /var/lib/dbus/machine-id && ! -L /var/lib/dbus/machine-id ]]; then sudo rm -f /var/lib/dbus/machine-id; fi'"
+    ]
+  }
+
+  # DigitalOcean cleanup script (fancy and fun for all builds)
+  provisioner "shell" {
+    inline = ["wget -O- https://raw.githubusercontent.com/digitalocean/marketplace-partners/master/scripts/90-cleanup.sh | sudo bash"]
+  }
+
+  # TODO add the other annoying uninstallation thing
+  # Things that the previous script doesn't handle
+  provisioner "shell" {
+    only = ["source.digitalocean.do-marketplace"]
+    inline = [
+      "sudo rm -rf /root/.ssh"
+    ]
   }
 
   provisioner "shell" {
-    script = "./scripts/extra.sh"
+    only = ["source.amazon-ebs.aws-ami"]
+    inline = [
+      "sudo rm -rf /home/ubuntu/.ssh"
+    ]
+  }
+
+  # Makes sure the images are clean
+  provisioner "shell" {
+    inline = ["wget -O- https://raw.githubusercontent.com/digitalocean/marketplace-partners/master/scripts/99-img-check.sh | sudo bash"]
   }
 
   // post-processor "manifest" {
