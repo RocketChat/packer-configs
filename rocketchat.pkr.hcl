@@ -83,6 +83,7 @@ build {
       "sudo swapon /swapfile",
       "echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab >/dev/null"
     ]
+    expect_disconnect = true // thanks aws . for some reason at swap creation step the connection gets frequently dropped
   }
 
   provisioner "file" {

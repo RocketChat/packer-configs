@@ -99,7 +99,7 @@ runs:
         export ROCKETCHAT_HOST="http://${rocketchat_host_public_ip}:3000"
         export ROCKETCHAT_TAG=${{ inputs.tag }}
         cd tests && . _.bash && bats api_basic/
-        yes | doctl compute droplet delete bats-${{ inputs.tag }}
+        doctl compute droplet delete bats-${{ inputs.tag }} --force
 
     - name: Test aws ami
       shell: bash
