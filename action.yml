@@ -87,6 +87,8 @@ runs:
     - name: Test digitalocean image
       shell: bash
       if: ${{ contains(inputs.source, 'digitalocean') }}
+      env:
+        ROCKETCHAT_MAX_ATTEMPTS: "250"
       run: |
         wget https://github.com/digitalocean/doctl/releases/download/v1.84.0/doctl-1.84.0-linux-amd64.tar.gz && 
           tar xf doctl-1.84.0-linux-amd64.tar.gz &&
@@ -98,8 +100,9 @@ runs:
         [[ -n "$rocketchat_host_public_ip" ]]
         export ROCKETCHAT_HOST="http://${rocketchat_host_public_ip}:3000"
         export ROCKETCHAT_TAG=${{ inputs.tag }}
-        cd tests && . _.bash && bats api_basic/
+        cd tests && . _.bash && bats api_basic/ || status=$?
         doctl compute droplet delete bats-${{ inputs.tag }} --force
+        exit "$status"
 
     - name: Test aws ami
       shell: bash
@@ -108,6 +111,7 @@ runs:
         AWS_DEFAULT_REGION: us-east-1
         AWS_SECRET_ACCESS_KEY: ${{ inputs.aws-secret-key }}
         AWS_ACCESS_KEY_ID: ${{ inputs.aws-key-id }}
+        ROCKETCHAT_MAX_ATTEMPTS: "250"
       run: |
         sudo apt install jq jo -y
         ami_id=$(aws ec2 describe-images --region us-east-1 --filters "Name=creation-date,Values="$(date '+%Y-%m-%d')"*" --filters ${{ format('Name=name,Values=rocket-chat-{0}*', inputs.tag) }} --output text --query 'Images[0].ImageId')
@@ -119,7 +123,8 @@ runs:
         [[ -n "$rocketchat_host_public_ip" ]]
         export ROCKETCHAT_TAG="${{ inputs.tag }}"
         export ROCKETCHAT_HOST="http://${rocketchat_host_public_ip}:3000"
-        cd tests && . _.bash && bats api_basic/
+        cd tests && . _.bash && bats api_basic/ || status=$?
         aws ec2 terminate-instances --instance-ids "$instance_id"
         aws ec2 wait instance-terminated --instance-id $instance_id
         aws ec2 delete-security-group --group-id $group_id
+        exit "$status"
