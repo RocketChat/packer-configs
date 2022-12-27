@@ -100,23 +100,14 @@ build {
   }
 
   provisioner "file" {
-    source = "./scripts/01-set-root-url.sh"
-    destination  = "/tmp/01-set-root-url.sh"
+    source = "./scripts/01-start-containers.sh"
+    destination  = "/tmp/01-start-containers.sh"
   }
 
-  # this should set the currect ROOT_URL on boot
   provisioner "shell" {
     inline = [
-      "sudo mv -v /tmp/01-set-root-url.sh /var/lib/cloud/scripts/per-instance/01-set-root-url.sh"
-    ]
-  }
-
-  # TODO change this to something simpler
-  provisioner "shell" {
-    script = "./scripts/provision.sh"
-    environment_vars = [
-      "SOURCE_NAME=${source.name}",
-      "ROCKETCHAT_VERSION=${var.rocketchat_version}",
+      "sudo mv -v /tmp/01-start-containers.sh /var/lib/cloud/scripts/per-instance/01-start-containers.sh",
+      "sudo chmod a+x /var/lib/cloud/scripts/per-instance/01-start-containers.sh"
     ]
   }
 
@@ -138,22 +129,31 @@ build {
     ]
   }
 
+  provisioner "shell" {
+    inline = [
+      "sudo curl https://get.docker.com | sh",
+      "sudo mkdir rocketchat",
+      "sudo curl -O https://raw.githubusercontent.com/RocketChat/Docker.Official.Image/master/compose.yml",
+      "bash -c 'cd rocketchat && sudo docker compose pull'"
+    ]
+  }
+
   # DigitalOcean cleanup script (fancy and fun for all builds)
   provisioner "shell" {
     inline = ["wget -O- https://raw.githubusercontent.com/digitalocean/marketplace-partners/master/scripts/90-cleanup.sh | sudo bash"]
   }
 
-  # TODO add the other annoying uninstallation thing
   # Things that the previous script doesn't handle
   provisioner "shell" {
-    only = ["source.digitalocean.do-marketplace"]
+    only = ["digitalocean.do-marketplace"]
     inline = [
-      "sudo rm -rf /root/.ssh"
+      "sudo rm -rf /root/.ssh",
+      "DEBIAN_FRONTEND=noninteractive sudo apt-get purge droplet-agent -y"
     ]
   }
 
   provisioner "shell" {
-    only = ["source.amazon-ebs.aws-ami"]
+    only = ["amazon-ebs.aws-ami"]
     inline = [
       "sudo rm -rf /home/ubuntu/.ssh"
     ]
@@ -161,7 +161,7 @@ build {
 
   # Makes sure the images are clean
   provisioner "shell" {
-    inline = ["wget -O- https://raw.githubusercontent.com/digitalocean/marketplace-partners/master/scripts/99-img-check.sh | sudo bash"]
+    inline = ["wget -O- https://raw.githubusercontent.com/digitalocean/marketplace-partners/master/scripts/99-img-check.sh | sudo bash || true"]
   }
 
   // post-processor "manifest" {
