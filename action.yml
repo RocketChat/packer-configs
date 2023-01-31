@@ -102,7 +102,7 @@ runs:
         export ROCKETCHAT_TAG=${{ inputs.tag }}
         cd tests && . _.bash && bats api_basic/ || status=$?
         doctl compute droplet delete bats-${{ inputs.tag }} --force
-        exit "$status"
+        exit $status
 
     - name: Test aws ami
       shell: bash
@@ -127,4 +127,4 @@ runs:
         aws ec2 terminate-instances --instance-ids "$instance_id"
         aws ec2 wait instance-terminated --instance-id $instance_id
         aws ec2 delete-security-group --group-id $group_id
-        exit "$status"
+        exit $status
