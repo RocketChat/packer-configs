@@ -134,7 +134,7 @@ build {
     inline = [
       "sudo curl https://get.docker.com | sh",
       "sudo mkdir rocketchat",
-      "sudo curl -O https://raw.githubusercontent.com/RocketChat/Docker.Official.Image/master/compose.yml",
+      "sudo curl -O https://raw.githubusercontent.com/RocketChat/Docker.Official.Image/six-mongo-update/compose.yml",
       "bash -c 'cd rocketchat && sudo docker compose pull'"
     ]
   }
