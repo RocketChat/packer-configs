@@ -1,117 +1,125 @@
-name: Build Marketplace Images
+name: Build Marketplace Images (AWS/DigitalOcean)
 
 on:
-  workflow_dispatch:
-  repository_dispatch:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+    secrets:
+      github-token:
+        required: true
+      digitalocean-token:
+        required: true
+      aws-secret-key:
+        required: true
+      aws-key-id:
+        required: true
+
+env:
+  PACKER_REPO: RocketChat/rocketchat-packer
+  TESTS_REPO: debdutdeb/rocket.chat.tests
 
 jobs:
-  ManualBuild:
-    runs-on: ubuntu-latest
-    outputs:
-      tag: ${{ steps.preflight.outputs.tag }}
-      run: ${{ steps.preflight.outputs.run }}
-    steps:
-      - name: Check latest
-        if: ${{ github.event_name == 'workflow_dispatch' }}
-        id: preflight
-        run: |
-          command -v jq &>/dev/null || sudo apt install jq -y
-          latest_stable="$(curl -s https://releases.rocket.chat/stable/info | jq -r .tag)"
-          latest_tag_here="$(
-            git -c 'versionsort.suffix=-' ls-remote -t --exit-code --refs --sort=-v:refname "https://github.com/RocketChat/rocketchat-packer" '*' |
-            awk -F/ '$NF !~ /rc|beta/ { print $NF; exit }'
-          )"
-          echo "latest_stable: $latest_stable"
-          echo "latest_tag_here: $latest_tag_here"
-          if [[ "$latest_tag_here" != "$latest_stable" ]]; then
-            echo "run=true" >>$GITHUB_OUTPUT
-            echo "tag=$latest_stable" >>$GITHUB_OUTPUT
-          else
-            echo "run=false" >>$GITHUB_OUTPUT
-          fi
-
-  ManualAWS:
-    needs:
-      - ManualBuild
+  build-aws:
     runs-on: ubuntu-latest
     steps:
-      - name: Build image
-        if: ${{ needs.ManualBuild.outputs.run == 'true' }}
+      - name: Build AWS image
         uses: RocketChat/rocketchat-packer@main
         with:
-          aws-key-id: ${{ secrets.AWS_KEY_ID }}
-          aws-secret-key: ${{ secrets.AWS_SECRET_KEY }}
-          tag: ${{ needs.ManualBuild.outputs.tag }}
+          aws-key-id: ${{ secrets.aws-key-id }}
+          aws-secret-key: ${{ secrets.aws-secret-key }}
+          tag: ${{ inputs.tag }}
           source: amazon-ebs.aws-ami
 
-  
-  ManualDigitalOcean:
-    needs:
-      - ManualBuild
+  is-aws-working:
     runs-on: ubuntu-latest
     steps:
-      - name: Build image
-        if: ${{ needs.ManualBuild.outputs.run == 'true' }}
+      - name: Clone test repository
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ env.TESTS_REPO }}
+          submodules: true
+          path: tests
+
+      - name: Verify aws ami
+        shell: bash
+        env:
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.aws-secret-key }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.aws-key-id }}
+          ROCKETCHAT_MAX_ATTEMPTS: "250"
+        run: |
+          sudo apt install jq jo -y
+          ami_id=$(aws ec2 describe-images --region us-east-1 --filters "Name=creation-date,Values="$(date '+%Y-%m-%d')"*" --filters ${{ format('Name=name,Values=rocket-chat-{0}*', inputs.tag) }} --output text --query 'Images[0].ImageId')
+          group_id=$(aws ec2 create-security-group --description "rocket.chat ${{ inputs.tag }}" --group-name bats-${{ inputs.tag }} --query GroupId --output text)
+          aws ec2 authorize-security-group-ingress --group-id $group_id --protocol tcp --port '0-65535' --cidr '0.0.0.0/0'
+          instance_id=$(aws ec2 run-instances --count 1 --image-id $ami_id --instance-type t2.medium --security-group-ids $group_id --query 'Instances[0].InstanceId' --output text)
+          aws ec2 wait instance-running --instance-id $instance_id
+          rocketchat_host_public_ip=$(aws ec2 describe-instances --instance-id $instance_id --query "Reservations[0].Instances[0].PublicIpAddress" --output text)
+          [[ -n "$rocketchat_host_public_ip" ]]
+          export ROCKETCHAT_TAG="${{ inputs.tag }}"
+          export ROCKETCHAT_URL="http://${rocketchat_host_public_ip}:3000"
+          cd tests && . _.bash && bats api_basic/ || status=$?
+          aws ec2 terminate-instances --instance-ids "$instance_id"
+          aws ec2 wait instance-terminated --instance-id $instance_id
+          aws ec2 delete-security-group --group-id $group_id
+          exit $status
+    
+  build-digitalocean:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build DigitalOcean image
         uses: RocketChat/rocketchat-packer@main
         with:
-          digitalocean-token: ${{ secrets.DO_TOKEN }}
-          tag: ${{ needs.ManualBuild.outputs.tag }}
+          digitalocean-token: ${{ secrets.digitalocean-token }}
+          tag: ${{ inputs.tag }}
           source: digitalocean.do-marketplace 
 
-  CreateReleaseAfterManual:
+  is-digitalocean-working:
     needs:
-      - ManualBuild
-      - ManualAWS
-      - ManualDigitalOcean
+      - build-digitalocean
     runs-on: ubuntu-latest
     steps:
-      - name: Create release with artifact
+      - name: Clone test repository
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ env.TESTS_REPO }}
+          submodules: true
+          path: tests
+
+      - name: Verify digitalocean image
+        shell: bash
+        env:
+          ROCKETCHAT_MAX_ATTEMPTS: "250"
+        run: |
+          wget https://github.com/digitalocean/doctl/releases/download/v1.84.0/doctl-1.84.0-linux-amd64.tar.gz && 
+            tar xf doctl-1.84.0-linux-amd64.tar.gz &&
+            sudo mv doctl /usr/local/bin
+          sudo apt-get install --no-install-recommends jq jo -y
+          doctl auth init --access-token ${{ secrets.digitalocean-token }}
+          image_id=$(doctl compute snapshot ls --format ID --no-header "rocket-chat-${{ inputs.tag }}-*")
+          rocketchat_host_public_ip=$(doctl compute droplet create --image "$image_id" --size s-2vcpu-4gb --region blr1 --format PublicIPv4 --no-header --wait bats-${{ inputs.tag }})
+          [[ -n "$rocketchat_host_public_ip" ]]
+          export ROCKETCHAT_URL="http://${rocketchat_host_public_ip}:3000"
+          export ROCKETCHAT_TAG=${{ inputs.tag }}
+          cd tests && . _.bash && bats api_basic/ || status=$?
+          doctl compute droplet delete bats-${{ inputs.tag }} --force
+          exit $status
+
+  create-release:
+    needs:
+      - is-digitalocean-working
+      - is-aws-working
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create release
         uses: softprops/action-gh-release@v1
         with:
-          repository: RocketChat/rocketchat-packer
-          token: ${{ secrets.GH_TOKEN_PERSONAL }}
-          name: ${{ needs.ManualBuild.outputs.tag }}
-          tag_name: ${{ needs.ManualBuild.outputs.tag }}
-          body: ${{ format('https://github.com/RocketChat/Rocket.Chat/releases/{0}', needs.ManualBuild.outputs.tag ) }}
+          repository: ${{ env.PACKER_REPO }}
+          token: ${{ secrets.github-token }}
+          name: ${{ inputs.tag }}
+          tag_name: ${{ inputs.tag }}
+          body: ${{ format('https://github.com/RocketChat/Rocket.Chat/releases/{0}', inputs.tag) }}
           draft: false
 
-  TriggeredBuildDigitalOcean:
-    if: ${{ github.event_name == 'repository_dispatch' }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Build image
-        uses: RocketChat/rocketchat-packer@main
-        with:
-          github-token: ${{ secrets.GH_TOKEN_PERSONAL }}
-          digitalocean-token: ${{ secrets.DO_TOKEN }}
-          tag: ${{ github.event.client_payload.tag }}
-          source: digitalocean.do-marketplace
-
-  TriggeredBuildAWS:
-    if: ${{ github.event_name == 'repository_dispatch' }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Build image
-        uses: RocketChat/rocketchat-packer@main
-        with:
-          aws-key-id: ${{ secrets.AWS_KEY_ID }}
-          aws-secret-key: ${{ secrets.AWS_SECRET_KEY }}
-          tag: ${{ github.event.client_payload.tag }}
-          source: amazon-ebs.aws-ami
-
-
-  CreateReleaseAfterEvent:
-    needs:
-      - TriggeredBuildDigitalOcean
-      - TriggeredBuildAWS
-    runs-on: ubuntu-latest
-    steps:
-      - name: Create release with artifact
-        uses: softprops/action-gh-release@v1
-        with:
-          repository: RocketChat/rocketchat-packer
-          token: ${{ secrets.GH_TOKEN_PERSONAL }}
-          name: ${{ github.event.client_payload.tag }}
-          tag_name: ${{ github.event.client_payload.tag }}
-          body: ${{ format('https://github.com/RocketChat/Rocket.Chat/releases/{0}', github.event.client_payload.tag) }}
-          draft: false
