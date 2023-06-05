@@ -1,3 +1,20 @@
+packer {
+	required_plugins {
+		amazon = {
+			version = ">= 1.2.6"
+			source = "github.com/hashicorp/amazon"
+		}
+		oracle = {
+			version = ">= 1.0.4"
+			source = "github.com/hashicorp/oracle"
+		}
+		digitalocean = {
+			version = ">= 1.1.1"
+			source = "github.com/hashicorp/digitalocean"
+		}
+	}
+}
+
 locals {
   timestamp = regex_replace(timestamp(), "[- TZ:]", "")
 }
