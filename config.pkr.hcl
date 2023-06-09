@@ -87,7 +87,7 @@ build {
     expect_disconnect = true
     inline = [
       "sudo apt-get update -qqq",
-      "DEBIAN_FRONTEND=noninteractive sudo apt-get -y upgrade",
+      "DEBIAN_FRONTEND=noninteractive sudo -E apt-get -y --allow-downgrades --allow-remove-essential --allow-change-held-packages -o Dpkg::Options::='--force-confold' -o Dpkg::Options::='--force-confdef' upgrade",
       "sudo reboot",
     ]
   }
