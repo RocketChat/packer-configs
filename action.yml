@@ -57,20 +57,20 @@ runs:
       with:
         command: validate
         arguments: -syntax-only
-        target: rocketchat.pkr.hcl
+        target: config.pkr.hcl
 
     - name: Initialize plugins
       uses: hashicorp/packer-github-actions@master
       with:
         command: init
-        target: rocketchat.pkr.hcl
+        target: config.pkr.hcl
 
     - name: Build images
       uses: hashicorp/packer-github-actions@master
       with:
         command: build
         arguments: ${{ format('-color=false -on-error=abort -only={0}', inputs.source) }}
-        target: rocketchat.pkr.hcl
+        target: config.pkr.hcl
       env:
         PACKER_LOG: '1'
         PKR_VAR_rocketchat_version: ${{ inputs.tag }}
