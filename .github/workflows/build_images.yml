@@ -69,7 +69,6 @@ jobs:
           exit $status
     
   build-digitalocean:
-    if: false
     runs-on: ubuntu-latest
     steps:
       - name: Build DigitalOcean image
@@ -112,7 +111,7 @@ jobs:
 
   create-release:
     needs:
-      #- is-digitalocean-working
+      - is-digitalocean-working
       - is-aws-working
     runs-on: ubuntu-latest
     steps:
