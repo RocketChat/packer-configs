@@ -1,0 +1,20 @@
+name: Manually build both images and test
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        type: string
+        required: true
+
+
+jobs:
+  do:
+    uses: ./.github/workflows/build_images.yml
+    with:
+      tag: ${{ inputs.tag }}
+    secrets:
+      github-token: ${{ secrets.GH_TOKEN_PERSONAL }}
+      digitalocean-token: ${{ secrets.DO_TOKEN }}
+      aws-secret-key: ${{secrets.AWS_SECRET_KEY }}
+      aws-key-id: ${{secrets.AWS_KEY_ID}}
