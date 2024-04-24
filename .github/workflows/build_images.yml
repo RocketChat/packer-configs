@@ -100,7 +100,7 @@ jobs:
             tar xf doctl-1.84.0-linux-amd64.tar.gz &&
             sudo mv doctl /usr/local/bin
           sudo apt-get install --no-install-recommends jq jo -y
-          image_id=$(doctl compute snapshot ls --format ID --no-header "rocket-chat-${{ inputs.tag }}-*")
+          image_id=$(doctl compute snapshot ls --format ID --no-header "rocket-chat-${{ inputs.tag }}-*" | tail -1)
           rocketchat_host_public_ip=$(doctl compute droplet create --image "$image_id" --size s-2vcpu-4gb --region blr1 --format PublicIPv4 --no-header --wait bats-${{ inputs.tag }})
           [[ -n "$rocketchat_host_public_ip" ]]
           export ROCKETCHAT_URL="http://${rocketchat_host_public_ip}:3000"
@@ -108,20 +108,6 @@ jobs:
           cd tests && . _.bash && bats api_basic/ || status=$?
           doctl compute droplet delete bats-${{ inputs.tag }} --force
           exit $status
-
-      - name: Update marketplace listing
-        shell: bash
-        env:
-          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.digitalocean-token }}
-        run: |
-          sudo apt-get install jo --no-install-recommends -y
-          image_id="$(doctl compute snapshot list --format ID 'rocket-chat-${{ inputs.tag }}-*' --no-header | tail -1)" # TODO: get it out of packet
-
-          payload="$(jo reasonForUpdate='new release' imageId=$image_id version=${{ inputs.tag }} releaseNotes='https://github.com/RocketChat/packer-configs/releases/${{ inputs.tag }}')"
-
-          echo "payload: $payload"
-
-          curl -XPATCH https://api.digitalocean.com/api/v1/vendor-portal/apps/5cbf905da6e1a17be804b006/versions/${{ inputs.tag }} -d "$payload" -H "Authorization: Bearer $DIGITALOCEAN_ACCESS_TOKEN"
 
   create-release:
     needs:
@@ -138,4 +124,25 @@ jobs:
           tag_name: ${{ inputs.tag }}
           body: ${{ format('https://github.com/RocketChat/Rocket.Chat/releases/{0}', inputs.tag) }}
           draft: false
+
+      - name: Update marketplace listing
+        shell: bash
+        env:
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.digitalocean-token }}
+        run: |
+          wget https://github.com/digitalocean/doctl/releases/download/v1.84.0/doctl-1.84.0-linux-amd64.tar.gz && 
+            tar xf doctl-1.84.0-linux-amd64.tar.gz &&
+            sudo mv doctl /usr/local/bin
+
+          sudo apt-get install jo --no-install-recommends -y
+          image_id="$(doctl compute snapshot list --format ID 'rocket-chat-${{ inputs.tag }}-*' --no-header | tail -1)" # TODO: get it out of packet
+
+          # TODO: add software versions array
+          payload="$(jo reasonForUpdate='new release' imageId=$image_id version=${{ inputs.tag }} releaseNotes='https://github.com/RocketChat/packer-configs/releases/${{ inputs.tag }}')"
+
+          echo "payload: $payload"
+
+          curl -XPATCH https://api.digitalocean.com/api/v1/vendor-portal/apps/5cbf905da6e1a17be804b006/versions/${{ inputs.tag }} -d "$payload" -H "Authorization: Bearer $DIGITALOCEAN_ACCESS_TOKEN"
+
+
 
