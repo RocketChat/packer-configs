@@ -135,7 +135,7 @@ jobs:
             sudo mv doctl /usr/local/bin
 
           sudo apt-get install jo --no-install-recommends -y
-          image_id="$(doctl compute snapshot list --format ID 'rocket-chat-${{ inputs.tag }}-*' --no-header | tail -1)" # TODO: get it out of packet
+          image_id="$(doctl compute snapshot list --format ID 'rocket-chat-${{ inputs.tag }}-*' --no-header | tail -1)" # TODO: get it out of packer
 
           # TODO: add software versions array
           payload="$(jo reasonForUpdate='new release' imageId=$image_id version=${{ inputs.tag }} releaseNotes='https://github.com/RocketChat/packer-configs/releases/${{ inputs.tag }}')"
