@@ -6,13 +6,38 @@ on:
       tag:
         type: string
         required: true
+      platform:
+        type: choice
+        options:
+          - AWS
+          - DigitalOcean
+          - Both
 
 
 jobs:
+  detect-source:
+    runs-on: ubuntu-latest
+    outputs:
+      source: ${{ steps._id.outputs.source }}
+    steps:
+      - id: _id
+        shell: bash
+        run: |
+          source=
+          case "${{ inputs.platform }}" in
+            "AWS") source="amazon-ebs.aws-ami" ;;
+            "DigitalOcean") source="digitalocean.do-marketplace" ;;
+            "Both") source="amazon-ebs.aws-ami,digitalocean.do-marketplace" ;;
+          esac
+
+          echo "source: $source"
+          echo "source=$source" >> $GITHUB_OUTPUT
   do:
     uses: ./.github/workflows/build_images.yml
+    needs: [ detect-source ]
     with:
       tag: ${{ inputs.tag }}
+      source: ${{ needs.detect-source.outputs.source }}
     secrets:
       github-token: ${{ secrets.GH_TOKEN_PERSONAL }}
       digitalocean-token: ${{ secrets.DO_TOKEN }}
