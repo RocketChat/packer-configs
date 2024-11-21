@@ -26,7 +26,7 @@ env:
 jobs:
   build-aws:
     runs-on: ubuntu-latest
-    if: ${{ contains(inputs.source, "amazon-ebs.aws-ami") }}
+    if: ${{ contains(inputs.source, 'amazon-ebs.aws-ami') }}
     steps:
       - name: Build AWS image
         uses: RocketChat/packer-configs@main
@@ -74,7 +74,7 @@ jobs:
     
   build-digitalocean:
     runs-on: ubuntu-latest
-    if: ${{ contains(inputs.source, "digitalocean.do-marketplace") }}
+    if: ${{ contains(inputs.source, 'digitalocean.do-marketplace') }}
     steps:
       - name: Build DigitalOcean image
         uses: RocketChat/packer-configs@main
