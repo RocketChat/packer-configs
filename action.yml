@@ -69,7 +69,7 @@ runs:
       uses: hashicorp/packer-github-actions@master
       with:
         command: build
-        arguments: ${{ format('-color=false -on-error=abort -only={0}', inputs.source) }}
+        arguments: ${{ format('-color=false -on-error=cleanup -only={0}', inputs.source) }}
         target: config.pkr.hcl
       env:
         PACKER_LOG: '1'

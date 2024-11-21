@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Build AWS image
-        uses: RocketChat/rocketchat-packer@main
+        uses: RocketChat/packer-configs@main
         with:
           aws-key-id: ${{ secrets.aws-key-id }}
           aws-secret-key: ${{ secrets.aws-secret-key }}
@@ -72,7 +72,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Build DigitalOcean image
-        uses: RocketChat/rocketchat-packer@main
+        uses: RocketChat/packer-configs@main
         with:
           digitalocean-token: ${{ secrets.digitalocean-token }}
           tag: ${{ inputs.tag }}
