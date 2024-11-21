@@ -4,10 +4,6 @@ packer {
 			version = ">= 1.2.6"
 			source = "github.com/hashicorp/amazon"
 		}
-		oracle = {
-			version = ">= 1.0.4"
-			source = "github.com/hashicorp/oracle"
-		}
 		digitalocean = {
 			version = ">= 1.1.1"
 			source = "github.com/hashicorp/digitalocean"
@@ -56,7 +52,7 @@ source "amazon-ebs" "aws-ami" {
   instance_type = "t2.micro"
   region        = "us-east-1"
   secret_key    = "${var.aws_secret_key}"
-  source_ami    = "ami-04505e74c0741db8d"
+  source_ami    = "ami-0866a3c8686eaeeba" // 24.04 lts
   ssh_username  = "ubuntu"
 }
 
@@ -82,7 +78,7 @@ build {
     ]
   }
 
-  provisioner "shell" {
+  provisioner "shell" { // upgrade instance
     pause_before      = "30s"
     expect_disconnect = true
     inline = [
@@ -130,6 +126,7 @@ build {
   }
 
   provisioner "shell" {
+    pause_before = "30s" // not needed, ideally, but sometimes auto updater hits and we hit a timeout waiting for apt to be available, FIXME: disable updater once before this step
     inline = [
       "DEBIAN_FRONTEND=noninteractive sudo apt-get update",
       "DEBIAN_FRONTEND=noninteractive sudo apt-get install -y ufw",
