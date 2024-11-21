@@ -8,6 +8,7 @@ on:
         type: string
       source:
         required: false
+        type: string
         default: amazon-ebs.aws-ami,digitalocean.do-marketplace
     secrets:
       github-token:
